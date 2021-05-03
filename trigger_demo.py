@@ -15,17 +15,20 @@ def add_command(arguments):
     items_list = list(sum(items_dictionary.items(), tuple()))
     execute("HSET", f"{app_name}:{item_identifier}", *items_list)
 
+def incr_and_get_message(item):
+    execute("HINCRBY", f'{app_name}:{item}', 'tries', 1)
+    return execute("HGETALL", f'{app_name}:{item}')
+
+
 def getMessage_command(arguments):
     command, list_name, count = arguments
     results = execute("lrange", list_name, int(0), int(count)-1)
-    for item in results:
-        execute("HINCRBY", f'{app_name}:{item}', 'tries', 1)
-    return results
+    return list(map(incr_and_get_message, results))
 
 gb = GB('CommandReader')
 gb.foreach(add_command)
 gb.register(trigger='add')
 
 get_gb = GB('CommandReader')
-get_gb.map(getMessage_command)
+get_gb.flatmap(getMessage_command)
 get_gb.register(trigger='getMessage')
