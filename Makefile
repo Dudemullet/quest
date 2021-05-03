@@ -10,4 +10,4 @@ flush:
 demo:
 	@cat demo_data.txt | xargs -L 1 redis-cli;
 
-clean: unload nuke-keys
+clean: unload flush
