@@ -29,13 +29,15 @@ def getMessage_command(arguments):
     results = execute("lrange", list_name, int(0), int(count)-1)
     return list(map(send_to_in_flight(visibility), results))
 
+def flight_a_message(identifier, timeout):
+    execute("HSET", f'{app_name}:{identifier}', 'in_flight', True)
+    execute("SETEX", f'{app_name}:{INFLIGHT_KEYS}:{identifier}', str(timeout), None)
+
 def send_to_in_flight(timeout):
     def __process(item):
         execute("HINCRBY", f'{app_name}:{item}', 'tries', 1)
-        execute("HSET", f'{app_name}:{item}', 'in_flight', True)
-        execute("SETEX", f'{app_name}:{INFLIGHT_KEYS}:{item}', str(timeout), None)
+        flight_a_message(item, timeout)
         return execute("HGETALL", f'{app_name}:{item}')
-
     return __process
 
 def un_flight_a_message(item):
