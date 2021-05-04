@@ -5,10 +5,10 @@ KEY_SEPARATOR = ":"
 DEFAULT_VISIBILITY_TIMEOUT = 5
 
 def add_command(arguments):
-    command, list_name, value = arguments
+    command, list_name, value, *rest = arguments
+
     item_identifier = uuid.uuid4()
     execute("RPUSH", list_name, item_identifier)
-
     items_dictionary = {
             "uuid": item_identifier,
             "value": value,
@@ -17,6 +17,12 @@ def add_command(arguments):
             }
     items_list = list(sum(items_dictionary.items(), tuple()))
     execute("HSET", f"{app_name}:{item_identifier}", *items_list)
+
+    #should we make this invisible for now ?
+    if len(rest) == 0:
+        return
+    visibility = int(rest[0])
+    flight_a_message(item_identifier, visibility)
 
 def getMessage_command(arguments):
     command, list_name, count, *visibility = arguments
