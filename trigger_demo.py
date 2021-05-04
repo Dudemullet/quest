@@ -26,8 +26,26 @@ def getMessage_command(arguments):
     else:
         visibility = int(visibility[0])
 
-    results = execute("lrange", list_name, int(0), int(count)-1)
-    return list(map(send_to_in_flight(visibility), results))
+    # Only get elements where in_flight = False
+    accumulator = []
+    index = 0
+    while len(accumulator) < int(count):
+        item_id = execute('lindex', list_name, index)
+        log(f'accu={accumulator} count={count} index={index} item_id={item_id}', level='warning')
+
+        # If no more items in array, exit loop with whatever we have found
+        if item_id is None:
+            log(f'Array has no more items, accu {accumulator}', level='warning')
+            break
+
+        in_flight = execute('hget', f'{app_name}:{item_id}', 'in_flight')
+        log(f'in_flight: {in_flight}', level='warning')
+        if in_flight == "False":
+            log("not in flight", level='warning')
+            log(f'appending {item_id}', level='warning')
+            accumulator.append(item_id)
+        index = index + 1
+    return list(map(send_to_in_flight(visibility), accumulator))
 
 def flight_a_message(identifier, timeout):
     execute("HSET", f'{app_name}:{identifier}', 'in_flight', True)
