@@ -14,6 +14,7 @@ def add_command(arguments):
             "value": value,
             "tries": 0,
             "in_flight": False,
+            "list": list_name,
             }
     items_list = list(sum(items_dictionary.items(), tuple()))
     execute("HSET", f"{app_name}:{item_identifier}", *items_list)
@@ -47,8 +48,6 @@ def getMessage_command(arguments):
         in_flight = is_item_in_flight(item_id)
         log(f'in_flight: {in_flight}', level='warning')
         if not in_flight:
-            log("not in flight", level='warning')
-            log(f'appending {item_id}', level='warning')
             accumulator.append(item_id)
         index = index + 1
     return list(map(send_to_in_flight(visibility), accumulator))
@@ -85,10 +84,27 @@ def send_to_in_flight(timeout):
     return __process
 
 def un_flight_a_message(item):
-    log(str(item), level='warning')
-    one, two, item_id = item['key'].rsplit(KEY_SEPARATOR)
-    log(f'Item id: {item_id}', level='warning')
+    one_ignore, two_ignore, item_id = item['key'].rsplit(KEY_SEPARATOR)
+    log(f'item_id={item_id} msg=visibility expired', level='warning')
+
+    try_count = int(execute("HGET", f'{app_name}:{item_id}', 'tries'))
+    dlq_setting = 5
+    if(try_count < dlq_setting):
+        log(f'item_id={item_id} tries={try_count} dlq_setting={dlq_setting} msg=item has not expired its try count', level='warning')
+        execute("HSET", f'{app_name}:{item_id}', 'in_flight', False)
+        return "OK"
+
+    # DLQ territory
+    log(f'item_id={item_id} tries={try_count} dlq_setting={dlq_setting} msg=try count is over DLQ setting', level='warning')
+    list_name = execute("HGET", f'{app_name}:{item_id}', 'list')
+    dlq_list_name = f'{list_name}_dlq'
+    log(f'item_id={item_id} list_name={list_name} dlq_list_name={dlq_list_name} msg=adding message to DLQ', level='warning')
+    execute("LREM", list_name, 1, item_id)
+    execute("HSET", f'{app_name}:{item_id}', "tries", 0)
     execute("HSET", f'{app_name}:{item_id}', 'in_flight', False)
+    execute("HSET", f'{app_name}:{item_id}', 'list', dlq_list_name)
+    execute("RPUSH", dlq_list_name, item_id)
+
 
 gb = GB('CommandReader')
 gb.foreach(add_command)
