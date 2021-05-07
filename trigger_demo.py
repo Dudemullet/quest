@@ -44,9 +44,9 @@ def getMessage_command(arguments):
             log(f'Array has no more items, accu {accumulator}', level='warning')
             break
 
-        in_flight = execute('hget', f'{app_name}:{item_id}', 'in_flight')
+        in_flight = is_item_in_flight(item_id)
         log(f'in_flight: {in_flight}', level='warning')
-        if in_flight == "False":
+        if not in_flight:
             log("not in flight", level='warning')
             log(f'appending {item_id}', level='warning')
             accumulator.append(item_id)
