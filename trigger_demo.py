@@ -72,7 +72,7 @@ def un_flight_a_message(item):
 
 gb = GB('CommandReader')
 gb.foreach(add_command)
-gb.register(trigger='add')
+gb.register(trigger='sendMessage')
 
 get_gb = GB('CommandReader')
 get_gb.flatmap(getMessage_command)
