@@ -53,6 +53,26 @@ def getMessage_command(arguments):
         index = index + 1
     return list(map(send_to_in_flight(visibility), accumulator))
 
+def deleteMessage_command(arguments):
+    command, list_name, item_id = arguments
+
+    is_in_flight = is_item_in_flight(item_id)
+    if not is_in_flight:
+        return "Message not in flight"
+
+    # remove timer
+    execute("DEL", f'{app_name}{KEY_SEPARATOR}{INFLIGHT_KEYS}{KEY_SEPARATOR}{item_id}')
+    # remove from list
+    execute("LREM", list_name, 1, item_id)
+    # remove data key
+    execute("DEL", f'{app_name}{KEY_SEPARATOR}{item_id}')
+    return "OK"
+
+def is_item_in_flight(item_id):
+    in_flight = execute('hget', f'{app_name}:{item_id}', 'in_flight')
+    return in_flight == "True"
+
+## Message flight
 def flight_a_message(identifier, timeout):
     execute("HSET", f'{app_name}:{identifier}', 'in_flight', True)
     execute("SETEX", f'{app_name}:{INFLIGHT_KEYS}:{identifier}', str(timeout), None)
@@ -77,6 +97,10 @@ gb.register(trigger='sendMessage')
 get_gb = GB('CommandReader')
 get_gb.flatmap(getMessage_command)
 get_gb.register(trigger='getMessage')
+
+gb = GB('CommandReader')
+gb.flatmap(deleteMessage_command)
+gb.register(trigger='deleteMessage')
 
 expire_gb = GB('KeysReader')
 expire_gb.foreach(un_flight_a_message)
