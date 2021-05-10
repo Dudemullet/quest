@@ -23,7 +23,7 @@ def add_command(arguments):
     if len(rest) == 0:
         return
     visibility = int(rest[0])
-    flight_a_message(item_identifier, visibility)
+    flight_a_message(uuid.uuid4(), item_identifier, visibility)
 
 def getMessage_command(arguments):
     command, list_name, count, *visibility = arguments
@@ -34,30 +34,34 @@ def getMessage_command(arguments):
         visibility = int(visibility[0])
 
     # Only get elements where in_flight = False
-    accumulator = []
+    results = []
     index = 0
-    while len(accumulator) < int(count):
+    while len(results) < int(count):
         item_id = execute('lindex', list_name, index)
-        log(f'accu={accumulator} count={count} index={index} item_id={item_id}', level='warning')
+        log(f'accu={results} count={count} index={index} item_id={item_id}', level='warning')
 
         # If no more items in array, exit loop with whatever we have found
         if item_id is None:
-            log(f'Array has no more items, accu {accumulator}', level='warning')
+            log(f'Array has no more items, accu {results}', level='warning')
             break
 
         in_flight = is_item_in_flight(item_id)
-        log(f'in_flight: {in_flight}', level='warning')
+        log(f'in_flight={in_flight}', level='warning')
         if not in_flight:
-            accumulator.append(item_id)
+            item_handle = uuid.uuid4()
+            log(f'item_id={item_id} item_handle={item_handle} msg=adding item id to results results', level='warning')
+            results.append([item_id, item_handle])
         index = index + 1
-    return list(map(send_to_in_flight(visibility), accumulator))
+    return list(map(send_to_in_flight(visibility), results))
 
 def deleteMessage_command(arguments):
-    command, list_name, item_id = arguments
+    command, list_name, item_handle = arguments
 
-    is_in_flight = is_item_in_flight(item_id)
+    is_in_flight = is_handle_in_flight(item_handle)
     if not is_in_flight:
         return "Message not in flight"
+
+    item_id = execute('get', f'{app_name}:{INFLIGHT_KEYS}:{item_id}')
 
     # remove timer
     execute("DEL", f'{app_name}{KEY_SEPARATOR}{INFLIGHT_KEYS}{KEY_SEPARATOR}{item_id}')
@@ -71,16 +75,23 @@ def is_item_in_flight(item_id):
     in_flight = execute('hget', f'{app_name}:{item_id}', 'in_flight')
     return in_flight == "True"
 
+def is_handle_in_flight(item_handle):
+    return bool(execute('exists', f'{app_name}:{INFLIGHT_KEYS}:{item_handle}'))
+
 ## Message flight
-def flight_a_message(identifier, timeout):
+def flight_a_message(handle, identifier, timeout):
     execute("HSET", f'{app_name}:{identifier}', 'in_flight', True)
-    execute("SETEX", f'{app_name}:{INFLIGHT_KEYS}:{identifier}', str(timeout), None)
+    execute("SETEX", f'{app_name}:{INFLIGHT_KEYS}:{handle}', str(timeout), identifier)
 
 def send_to_in_flight(timeout):
-    def __process(item):
-        execute("HINCRBY", f'{app_name}:{item}', 'tries', 1)
-        flight_a_message(item, timeout)
-        return execute("HGETALL", f'{app_name}:{item}')
+    def __process(item_array):
+        item_id, item_handle = item_array
+        execute("HINCRBY", f'{app_name}:{item_id}', 'tries', 1)
+        flight_a_message(item_handle, item_id, timeout)
+        results_list = execute("HGETALL", f'{app_name}:{item_id}')
+        results.append('handle')
+        results.append(item_handle)
+        return results_dict
     return __process
 
 def un_flight_a_message(item):
@@ -122,4 +133,4 @@ expire_gb = GB('KeysReader')
 expire_gb.foreach(un_flight_a_message)
 expire_gb.register(prefix=f'{app_name}:{INFLIGHT_KEYS}:*',
              eventTypes=['expired'],
-             readValue=False)
+             readValue=True)
