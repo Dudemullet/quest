@@ -48,7 +48,7 @@ def getMessage_command(arguments):
         in_flight = is_item_in_flight(item_id)
         log(f'in_flight={in_flight}', level='warning')
         if not in_flight:
-            item_handle = uuid.uuid4()
+            item_handle = str(uuid.uuid4())
             log(f'item_id={item_id} item_handle={item_handle} msg=adding item id to results results', level='warning')
             results.append([item_id, item_handle])
         index = index + 1
@@ -61,16 +61,19 @@ def deleteMessage_command(arguments):
     if not is_in_flight:
         return "Message not in flight"
 
-    item_id = execute('get', f'{app_name}:{INFLIGHT_KEYS}:{item_id}')
+    item_id = execute('get', f'{app_name}:{INFLIGHT_KEYS}:db:{item_handle}')
 
     # remove timer
-    execute("DEL", f'{app_name}{KEY_SEPARATOR}{INFLIGHT_KEYS}{KEY_SEPARATOR}{item_id}')
+    execute("DEL", f'{app_name}{KEY_SEPARATOR}{INFLIGHT_KEYS}{KEY_SEPARATOR}{item_handle}')
+    # remove timer db
+    execute("DEL", f'{app_name}{KEY_SEPARATOR}{INFLIGHT_KEYS}{KEY_SEPARATOR}db{KEY_SEPARATOR}{item_handle}')
     # remove from list
     execute("LREM", list_name, 1, item_id)
     # remove data key
     execute("DEL", f'{app_name}{KEY_SEPARATOR}{item_id}')
     return "OK"
 
+## Message flight
 def is_item_in_flight(item_id):
     in_flight = execute('hget', f'{app_name}:{item_id}', 'in_flight')
     return in_flight == "True"
@@ -78,10 +81,14 @@ def is_item_in_flight(item_id):
 def is_handle_in_flight(item_handle):
     return bool(execute('exists', f'{app_name}:{INFLIGHT_KEYS}:{item_handle}'))
 
-## Message flight
 def flight_a_message(handle, identifier, timeout):
+    log(f'flighting a message', level='warning')
     execute("HSET", f'{app_name}:{identifier}', 'in_flight', True)
-    execute("SETEX", f'{app_name}:{INFLIGHT_KEYS}:{handle}', str(timeout), identifier)
+    execute("SETEX", f'{app_name}:{INFLIGHT_KEYS}:{handle}', str(timeout), None)
+    temp_key = f'{app_name}:{INFLIGHT_KEYS}:db:{handle}'
+    log(f'temp_key={temp_key} msg=printing db key', level='warning')
+    return_value = execute("SET", temp_key, str(identifier))
+    log(f'return_value={return_value} msg=setting db key', level='warning')
 
 def send_to_in_flight(timeout):
     def __process(item_array):
@@ -89,14 +96,19 @@ def send_to_in_flight(timeout):
         execute("HINCRBY", f'{app_name}:{item_id}', 'tries', 1)
         flight_a_message(item_handle, item_id, timeout)
         results_list = execute("HGETALL", f'{app_name}:{item_id}')
-        results.append('handle')
-        results.append(item_handle)
-        return results_dict
+        results_list.append('handle')
+        results_list.append(item_handle)
+        return results_list
     return __process
 
 def un_flight_a_message(item):
-    one_ignore, two_ignore, item_id = item['key'].rsplit(KEY_SEPARATOR)
-    log(f'item_id={item_id} msg=visibility expired', level='warning')
+    one_ignore, two_ignore, item_handle = item['key'].rsplit(KEY_SEPARATOR)
+
+    item_id = execute("GET", f'{app_name}:{INFLIGHT_KEYS}:db:{item_handle}')
+    execute("DEL", f'{app_name}:{INFLIGHT_KEYS}:db:{item_handle}')
+
+    log(f'item_id={item_id} item_handle={item_handle} msg=visibility expired', level='warning')
+    log(str(item), level='warning')
 
     try_count = int(execute("HGET", f'{app_name}:{item_id}', 'tries'))
     dlq_setting = 5
@@ -132,5 +144,5 @@ gb.register(trigger='deleteMessage')
 expire_gb = GB('KeysReader')
 expire_gb.foreach(un_flight_a_message)
 expire_gb.register(prefix=f'{app_name}:{INFLIGHT_KEYS}:*',
-             eventTypes=['expired'],
-             readValue=True)
+        eventTypes=['expired'],
+        readValue=True)
