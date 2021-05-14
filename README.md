@@ -18,12 +18,15 @@ RG.TRIGGER sendMessage list_name value [timeout]
 ```
 
 >list_name (required)
+
 The name of the list to add this message to
 
 >value (required)
+
 The message itself
 
 >timeout (optional)
+
 Amount of seconds before this message is visible
 
 ### getMessage
@@ -34,12 +37,15 @@ RG.TRIGGER getMessage list_name count [timeout]
 ```
 
 >list_name (required)
+
 The name of the list to get messages from
 
 >count (required)
+
 The amount of messages to get from the list
 
 >timeout (optional)
+
 Amount of seconds you need to process this message, after the timeout. Quest will make this message visible again for anyone else to process and the handle will not be able to remove this message from the list
 
 #### Returns
@@ -51,30 +57,38 @@ each item is represented by an array:
 #### Message fields
 
 >uuid
+
 The immutable id given to the message when sent to Quest. This uuid will never change inside Quest even when the message gets moved to a DLQ
 
 >value
+
 whatever value was assigned to the message when added to Quest
 
 >tries
+
 The amount of times the message has been delivered before without it being deleted/processed. In the apps current state, after reaching `5` it will be sent to a `DLQ`
 
 >in_flight
+
 For internal use only. Flag to know if the message is  currently in flight or not
 
 >list
+
 The name of the list this message was retrieved from
 
 >handle
+
 The <uuid> used to delete this message
 
 ### deleteMessage
 Delete a message from a queue
 
 >list_name (required)
+
 The list to remove this message from
 
 >handle (required)
+
 The handle given to this message via `getMessage`. Notice that a single message gets different handles every time it delivered via `getMessage`
 
 If a message tries to get deleted after its `timeout` has expired a `Message not in flight` message will be returned
