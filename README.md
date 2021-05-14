@@ -51,7 +51,8 @@ Amount of seconds you need to process this message, after the timeout. Quest wil
 #### Returns
 The list of items specified by count or an empty array if list doesn't exist or has no more items. If the list has less items available(not in-flight) than those specified by count it will only return those.
 
-each item is represented by an array:
+each item is represented by an array of values that map to a dictionary:
+
 `"['uuid', <uuid>, 'value', <msg_value>, 'tries', <number>, 'in_flight', <python_bool[True|False]>, 'list', <string>, 'handle', <uuid>]"`
 
 #### Message fields
@@ -82,6 +83,10 @@ The <uuid> used to delete this message
 
 ### deleteMessage
 Delete a message from a queue
+
+```python
+RG.TRIGGER deleteMessage list_name handle
+```
 
 >list_name (required)
 
