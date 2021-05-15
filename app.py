@@ -2,7 +2,7 @@ import uuid
 app_name = "quest"
 INFLIGHT_KEYS = "inflight"
 KEY_SEPARATOR = ":"
-DEFAULT_VISIBILITY_TIMEOUT = 5
+DEFAULT_VISIBILITY_TIMEOUT = 30
 
 def add_command(arguments):
     command, list_name, value, *rest = arguments
