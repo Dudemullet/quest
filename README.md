@@ -7,6 +7,21 @@ This is a redis module (using RedisGears) that provides AWS SQS like api on top 
   - Dead letter queues
   - Message handle
 
+## Installing
+There are a set of commands in the `Makefile` which will help you run and install this library locally. To be able to run this on your redis server you need to make sure the `RedisGears` module is loaded on that redis server.
+
+### start (Requires Docker)
+
+`make start` runs a `RedisGears` enabled redis server via docker
+
+### load
+
+Will load all of the libraries commands into your local redis server. You could modify this command to target your remote redis server. After loading this module on a redis server you will be able to run the commands on that server.
+
+### unload (WARNING ⚠️ )
+
+Will unregister commands from a redis server. This was useful while testing but should not be used in a server where other `RedisGears` commands are loaded as this will delete them indescriminately.
+
 ## Api
 This module adds 3 different `RedisGears` commands.
 
